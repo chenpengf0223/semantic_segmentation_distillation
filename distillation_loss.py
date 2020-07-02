@@ -35,8 +35,8 @@ def relational_knowledge_distillation(source, target):
         angle_loss    = Huber_loss(   angle_wise_potential(source),    angle_wise_potential(target))
         return distance_loss, angle_loss
 
-def pairwise_suprvise(student_feature, teacher_feature, distillation_mask):
-    def map_fn_pairwise_suprvise(student, teacher, mask):
+def pairwise_suprvise(student_feature, teacher_feature):
+    def map_fn_pairwise_suprvise(student, teacher):
         student_feature_shape = student.get_shape()
         if student_feature_shape.ndims != 3:
             raise ValueError('student_feature must be of size [height, width, c]')
@@ -48,17 +48,11 @@ def pairwise_suprvise(student_feature, teacher_feature, distillation_mask):
         teacher = tf.reshape(teacher,
          (teacher_feature_shape[0]*teacher_feature_shape[1], teacher_feature_shape[2]))
 
-        if mask.get_shape().ndims != 0:
-            raise ValueError('teacher_feature must be of size [height, width, c]')
-        
-        return tf.cond(pred=tf.equal(mask, 1),
-            true_fn=lambda: relational_knowledge_distillation(student, teacher),
-            false_fn=lambda: (0.0, 0.0))
-        #return relational_knowledge_distillation(student, teacher)
+        return relational_knowledge_distillation(student, teacher)
 
     distance_loss, angle_loss = tf.map_fn(
-        fn=lambda x: map_fn_pairwise_suprvise(student=x[0], teacher=x[1], mask=x[2]),
-        elems=(student_feature, teacher_feature, distillation_mask),
+        fn=lambda x: map_fn_pairwise_suprvise(student=x[0], teacher=x[1]),
+        elems=(student_feature, teacher_feature),
         dtype=(tf.float32, tf.float32)
         )
     return tf.reduce_mean(distance_loss), tf.reduce_mean(angle_loss)
